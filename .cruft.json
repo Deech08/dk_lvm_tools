@@ -1,0 +1,31 @@
+{
+  "template": "https://github.com/OpenAstronomy/packaging-guide",
+  "commit": "e7f59ff1c4a17783223b68ae5e2a03969ba5847d",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "package_name": "dk_lvm_tools",
+      "module_name": "dk_lvm_tools",
+      "short_description": "SDSS-V LVM Visualization Tools",
+      "author_name": "Dhanesh Krishnarao (DK)",
+      "author_email": "dkrishnarao@coloradocollege.edu",
+      "project_url": "https://github.com/Deech08/dk_lvm_tools",
+      "license": "BSD 3-Clause",
+      "minimum_python_version": "3.12",
+      "use_compiled_extensions": "n",
+      "enable_dynamic_dev_versions": "y",
+      "include_example_code": "y",
+      "include_cruft_update_github_workflow": "y",
+      "_sphinx_theme": "alabaster",
+      "_parent_project": "",
+      "_install_requires": "",
+      "_copy_without_render": [
+        "docs/_templates",
+        "docs/_static",
+        ".github/workflows/sub_package_update.yml"
+      ],
+      "_template": "https://github.com/OpenAstronomy/packaging-guide"
+    }
+  },
+  "directory": null
+}
