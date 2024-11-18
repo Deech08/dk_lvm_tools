@@ -10,7 +10,7 @@ name = "dk_lvm_tools"
 description = "SDSS-V LVM Visualization Tools"
 requires-python = ">=3.12"
 readme = { file = "README.rst", content-type = "text/x-rst" }
-license = { file = "licenses/LICENSE.rst", content-type = "text/plain" }
+license = { file = "licenses/LICENSE.rst" }
 authors = [
   { name = "Dhanesh Krishnarao (DK)", email = "dkrishnarao@coloradocollege.edu" },
 ]
