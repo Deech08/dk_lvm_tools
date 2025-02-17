@@ -1,7 +1,7 @@
 [build-system]
 requires = [
   "setuptools>=62.1",
-  "setuptools_scm[toml]>=6.2",
+  "setuptools_scm[toml]>=8.0.0",
   "wheel",]
 build-backend = "setuptools.build_meta"
 
@@ -10,7 +10,7 @@ name = "dk_lvm_tools"
 description = "SDSS-V LVM Visualization Tools"
 requires-python = ">=3.12"
 readme = { file = "README.rst", content-type = "text/x-rst" }
-license = { file = "licenses/LICENSE.rst", content-type = "text/plain" }
+license = { file = "licenses/LICENSE.rst" }
 authors = [
   { name = "Dhanesh Krishnarao (DK)", email = "dkrishnarao@coloradocollege.edu" },
 ]
@@ -38,10 +38,11 @@ zip-safe = false
 include-package-data = true
 
 [tool.setuptools.packages.find]
+include = ["dk_lvm_tools*"]
 exclude = ["dk_lvm_tools._dev*"]
 
 [tool.setuptools_scm]
-write_to = "dk_lvm_tools/_version.py"
+version_file = "dk_lvm_tools/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = [
