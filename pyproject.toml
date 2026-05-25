@@ -14,7 +14,14 @@ license = { file = "licenses/LICENSE.rst", content-type = "text/plain" }
 authors = [
   { name = "Dhanesh Krishnarao (DK)", email = "dkrishnarao@coloradocollege.edu" },
 ]
-dependencies = []
+dependencies = [
+    "astropy",
+    "matplotlib",
+    "numpy",
+    "seaborn",
+    "pandas",
+    "tqdm"
+]
 dynamic = ["version"]
 
 [project.scripts]
