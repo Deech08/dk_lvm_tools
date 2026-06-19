@@ -3,7 +3,7 @@ from astropy import units as u
 from astropy.table import Table, join, vstack
 from astropy.io import fits
 from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord, Angle
+from astropy.coordinates import SkyCoord, Angle, LSR
 
 from .dapTableMixin import dapMixin
 
@@ -324,6 +324,8 @@ def read_DAP_file(dap_file,
 		}
 	
 	with fits.open(dap_file) as dap_hdu:
+		#header
+		head = dap_hdu[0].header
 		tab_PT=Table(dap_hdu['PT'].data)
 		if tab_PT["id"].dtype.kind == "S":
 			tab_PT["id"] = np.char.decode(tab_PT["id"], 'utf-8', errors = "replace") 
@@ -636,4 +638,28 @@ def read_DAP_file(dap_file,
 				print('----------------------------------')
 				list_columns(tab_SIGMA.colnames)
 		
+	
+	# convert velocities to heliocentric
+	
+
+	coords_helio = SkyCoord(
+		ra = tab_DAP["ra"],
+		dec = tab_DAP["dec"],
+		distance = np.ones_like(tab_DAP["ra"].value)*100*u.pc ,
+		pm_ra_cosdec = np.zeros_like(tab_DAP["ra"].value)*u.mas/u.yr,
+		pm_dec = np.zeros_like(tab_DAP["ra"].value)*u.mas/u.yr,
+		radial_velocity = np.zeros_like(tab_DAP["ra"].value)*u.km/u.s,
+		)
+	coords_lsr = coords_helio.transform_to(LSR)
+
+	# add conversion factors to table
+	tab_DAP["HELIO_V_CORRECTION"] = np.ones_like(tab_DAP["ra"].value)*head["HIERARCH WAVE HELIORV_SCI"]*u.km/u.s
+	tab_DAP["LSR_V_CORRECTION"] = coords_lsr.radial_velocity
+
+	for colname in tab_DAP.colnames:
+		if colname[:3] == "vel":
+			tab_DAP[colname]+= tab_DAP["HELIO_V_CORRECTION"] + tab_DAP["LSR_V_CORRECTION"]
+
+
+
 	return tab_DAP
