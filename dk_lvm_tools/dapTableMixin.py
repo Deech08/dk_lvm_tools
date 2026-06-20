@@ -4,7 +4,7 @@ from astropy import units as u
 from astropy.io import fits
 import astropy.constants as constants
 
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, Normalize
 
 try:
     import cartopy.crs as ccrs
@@ -2133,6 +2133,7 @@ class dapMixin(object):
 
     def plot_lv(self,
                 colname,
+                vel_diff_colname = None,
                 fig = None,
                 ax = None,
                 lrange = None,
@@ -2163,6 +2164,10 @@ class dapMixin(object):
         ----------
         colname: 'str'
             column name for flux to use for plot
+        vel_diff_colname: 'str', optional, must be keyword
+            if provided will colormap the lv diagram by intensity weighted velocity difference
+            intensity weighting is done with colname
+            velocity difference is from colname - vel_diff_colname
         fig: 'plt.figure', optional, must be keyword
             if provided, will create axes on the figure provided
         ax: 'plt.figure.axes' or 'cartopy.axes`, optional, must be keyword
@@ -2252,6 +2257,11 @@ class dapMixin(object):
                                                        snr_cut = snr_cut, 
                                                        rayleigh = rayleigh, 
                                                        velocity = True)
+        if vel_diff_colname is not None:
+            flux_vd, velocity_vd = tab_filtered.get_snr_masked_intensity(vel_diff_colname, 
+                                                       snr_cut = snr_cut, 
+                                                       rayleigh = rayleigh, 
+                                                       velocity = True)
 
         if velocity_bounds is None:
             velocity_bounds = [-200, 200] * u.km/u.s 
@@ -2263,6 +2273,12 @@ class dapMixin(object):
         vel_mask |= velocity > velocity_bounds[1]
         flux.mask = np.logical_or(flux.mask,vel_mask) 
         velocity.mask = np.logical_or(velocity.mask,vel_mask) 
+
+        if vel_diff_colname is not None:
+            vel_mask_vd = velocity_vd < velocity_bounds[0]
+            vel_mask_vd |= velocity_vd > velocity_bounds[1]
+            flux_vd.mask = np.logical_or(flux_vd.mask,vel_mask_vd) 
+            velocity_vd.mask = np.logical_or(velocity_vd.mask,vel_mask_vd) 
 
         if clip_flux is not None:
             if not hasattr(clip_flux, "unit"):
@@ -2279,57 +2295,364 @@ class dapMixin(object):
 
         valid_mask = ~flux.mask
 
-        if kind == "hex":
-            hb = ax.hexbin(lon[valid_mask], velocity[valid_mask], 
-                           gridsize = gridsize,
-                           bins = bins, 
-                           C = flux.value[valid_mask],
-                           norm = kwargs.pop("norm",LogNorm(vmin = 1e0, vmax = 1e3)),
-                           **kwargs)
+    
 
-        if kind in ["contour", "contourf"]:
-            # Make 2D density histogram
-            H, xedges, yedges = np.histogram2d(
-                lon.unmasked[valid_mask].value,
-                velocity.unmasked[valid_mask].value,
-                weights = flux.unmasked.value[valid_mask],
+        if vel_diff_colname is not None:
+            valid_mask_vd = ~flux_vd.mask 
+            valid_mask_vd &= valid_mask
+            # compute weighted histogram data
+            # Flux Weight
+            H_flux, xedges, yedges = np.histogram2d(
+                lon.unmasked[valid_mask_vd].value,
+                velocity.unmasked[valid_mask_vd].value,
+                weights = flux.unmasked.value[valid_mask_vd],
                 bins=gridsize,
                 density=False,
-            )
+                )
 
-            # Smooth the density field
-            H_smooth = gaussian_filter(H, sigma=sigma)
+            #Flux * Velocity difference weight
+            H_vd, xedges, yedges = np.histogram2d(
+                lon.unmasked[valid_mask_vd].value,
+                velocity.unmasked[valid_mask_vd].value,
+                weights = flux.unmasked.value[valid_mask_vd] * (
+                        velocity.unmasked[valid_mask_vd].value - 
+                        velocity_vd.unmasked[valid_mask_vd].value
+                    ),
+                bins=gridsize,
+                density=False,
+                )
 
-            # Convert bin edges to coordinates
-            X, Y = np.meshgrid(
-                (xedges[:-1] + xedges[1:]) / 2,
-                (yedges[:-1] + yedges[1:]) / 2
-            )
+            H_vd_flux_weighted = H_vd / H_flux
 
-            if auto_level_factors is None:
-                auto_level_factors = [.1,.80]
-            levels = kwargs.pop("levels", np.geomspace(
-            H_smooth.max()*auto_level_factors[0],
-            H_smooth.max()*auto_level_factors[1],
-            n_levels),
-            )
+            hb = ax.pcolormesh(xedges, yedges, H_vd_flux_weighted.T, 
+                                norm = kwargs.pop("norm", Normalize(vmin = -10, vmax = 10)),
+                                cmap = kwargs.pop("cmap", "RdBu_r"),
+                                **kwargs)
 
-            hb = ax.contour(X, Y, H_smooth.T, 
-                            alpha = kwargs.pop("alpha", 0.7),
-                            # norm = kwargs.pop("norm", LogNorm(vmin = 1e0, vmax = 1e3)),
-                            levels = levels,
-                            **kwargs)
+
+
+        else:
+
+            if kind == "hex":
+                hb = ax.hexbin(lon[valid_mask], velocity[valid_mask], 
+                               gridsize = gridsize,
+                               bins = bins, 
+                               C = flux.value[valid_mask],
+                               norm = kwargs.pop("norm",LogNorm(vmin = 1e0, vmax = 1e3)),
+                               **kwargs)
+
+            if kind in ["contour", "contourf"]:
+                # Make 2D density histogram
+                H, xedges, yedges = np.histogram2d(
+                    lon.unmasked[valid_mask].value,
+                    velocity.unmasked[valid_mask].value,
+                    weights = flux.unmasked.value[valid_mask],
+                    bins=gridsize,
+                    density=False,
+                )
+
+                # Smooth the density field
+                H_smooth = gaussian_filter(H, sigma=sigma)
+
+                # Convert bin edges to coordinates
+                X, Y = np.meshgrid(
+                    (xedges[:-1] + xedges[1:]) / 2,
+                    (yedges[:-1] + yedges[1:]) / 2
+                )
+
+                if auto_level_factors is None:
+                    auto_level_factors = [.1,.80]
+                levels = kwargs.pop("levels", np.geomspace(
+                H_smooth.max()*auto_level_factors[0],
+                H_smooth.max()*auto_level_factors[1],
+                n_levels),
+                )
+
+                hb = ax.contour(X, Y, H_smooth.T, 
+                                alpha = kwargs.pop("alpha", 0.7),
+                                # norm = kwargs.pop("norm", LogNorm(vmin = 1e0, vmax = 1e3)),
+                                levels = levels,
+                                **kwargs)
         if colorbar:
-            if not "label" in cbar_kwargs:
+            if vel_diff_colname is not None:
+                cb = fig.colorbar(hb, label = cbar_kwargs.pop("label",r"$\Delta~V$ [{}$-${}] ({})".format(colname[5:], 
+                                                        vel_diff_colname[5:], 
+                                                        velocity.unit)),
+                    **cbar_kwargs)
+
+            else:
+
                 try:
-                    cbar_kwargs["label"] = "{} ({})".format(colname, flux.unit)
+                    cb = fig.colorbar(hb, label = cbar_kwargs.pop("label","{} ({})".format(colname, flux.unit)),
+                    **cbar_kwargs)
 
                 except ValueError:
-                    cbar_kwargs["label"] = None
-            cb = fig.colorbar(hb, **cbar_kwargs)
+                    cb = fig.colorbar(hb, **cbar_kwargs)
 
         if label_axes:
             _ = ax.set_xlabel("Galactic Longitude (deg)", fontsize = 12)
+            _ = ax.set_ylabel(r"$V_{{LSR}}$ ($km~s^{{-1}}$)", fontsize = 12)
+
+        return fig
+
+
+
+
+    def plot_bv(self,
+                colname,
+                vel_diff_colname = None,
+                fig = None,
+                ax = None,
+                lrange = None,
+                brange = None,
+                bounds = None,
+                radius = None,
+                snr_cut = 5,
+                kind='hex',
+                gridsize=50,
+                bins = "log",
+                rayleigh = True,
+                velocity_bounds = None,
+                latitude_colname = "GAL-LAT",
+                colorbar = True,
+                clip_flux = None,
+                label_axes = True,
+                wrap_at_180 = True,
+                sigma = 2,
+                auto_level_factors = None,
+                n_levels = 6,
+                cbar_kwargs = {},
+                **kwargs
+                ):
+        """
+        Plot latitude vs. velocity diagram for specified flux column
+
+        Parameters
+        ----------
+        colname: 'str'
+            column name for flux to use for plot
+        vel_diff_colname: 'str', optional, must be keyword
+            if provided will colormap the lv diagram by intensity weighted velocity difference
+            intensity weighting is done with colname
+            velocity difference is from colname - vel_diff_colname
+        fig: 'plt.figure', optional, must be keyword
+            if provided, will create axes on the figure provided
+        ax: 'plt.figure.axes' or 'cartopy.axes`, optional, must be keyword
+            if provided, will plot on these axes
+            can provide ax as a cartpy projection that contains different map projections
+        lrange (tuple): Optional 
+            (min, max) Galactic longitude range.
+        brange (tuple): Optional 
+            (min, max) Galactic latitude range.
+        bounds: `list` or `Quantity` or `SkyCoord`
+            if provided, will ignore l_range and b_range
+            if `list` or `Quantity` must be formatted as:
+                [min Galactic Longitude, max Galactic Longitude, min Galactic Latitude, max Galactic Latitude]
+                or 
+                [center Galactic Longitude, center Galactic Latitude] and requires radius keyword to be set
+                default units of u.deg are assumed
+            if `SkyCoord', must be length 4 or length 1 or length 2
+                length 4 specifies 4 corners of rectangular shape
+                length 1 specifies center of circular region and requires radius keyword to be set
+                length 2 specifies two corners of rectangular region
+        radius: 'number' or 'Quantity', optional, must be keyword
+            sets radius of circular region
+            only used if bounds is provided and is 2d
+        snr_cut: 'float'
+            Signal to Noise cut to impose on data - default of 3
+        kind: 'str',
+            kind of plot to make ["scatter", "hex", etc]
+        gridsize: 'int'
+            number of bins to use for histogramming
+        bins: 'str'
+            scaling to use for colormapping - default of log
+        rayleigh: 'bool'
+            if True, converts flux to rayleighs
+        velocity_bounds: 'list-like'
+            [min,max] velocity to use for velocity axis
+        latitude_colname: 'str'
+            specifiy column name that has longitude axis, default of "GAL-LON"
+        colorbar: 'bool'
+            if True, adds colorbar
+        clip_flux: 'u.Quantity'
+            flux value to clip max values of flux at
+        label_axes: 'bool'
+            if True, will label x and y axis
+        wrap_at_180: 'bool'
+            if True, wraps coordinates at 180 degrees
+        sigma: 'float'
+            gaussian filter smoothing factor if kind is "contour"
+            default of 2
+        auto_level_factors: 'list-like'
+            [low,high] percentiles to use when auto computing levels for contour
+            should be between 0 and 1
+        n_levels: 'int'
+            number of levels to use if autocalculating levels for contour
+        """
+        if not hasattr(ax, 'scatter'):
+            if not hasattr(fig, 'add_subplot'):
+                fig = plt.figure(constrained_layout = True)
+                ax = fig.add_subplot(111)
+            else:
+                ax = fig.add_subplot(111)
+        else:
+            if not hasattr(fig, 'add_subplot'):
+                fig = ax.get_figure()
+
+        # Filter by galactic coordinate ranges
+        if bounds is None:
+            if (lrange is None) & (brange is None):
+                tab_filtered = self
+            else:
+                if lrange is None:
+                    lrange = [-180,180]*u.deg
+                elif brange is None:
+                    brange = [-90,90]*u.deg
+
+                if not hasattr(lrange, "unit"):
+                    lrange*=u.deg
+                if not hasattr(brange, "unit"):
+                    brange*=u.deg
+
+                bounds = [*lrange, *brange]
+
+                tab_filtered = self.sky_section(bounds = bounds, radius = radius, wrap_at_180 = wrap_at_180)
+        else:
+            tab_filtered = self.sky_section(bounds = bounds, radius = radius, wrap_at_180 = wrap_at_180)
+
+        flux, velocity = tab_filtered.get_snr_masked_intensity(colname, 
+                                                       snr_cut = snr_cut, 
+                                                       rayleigh = rayleigh, 
+                                                       velocity = True)
+        if vel_diff_colname is not None:
+            flux_vd, velocity_vd = tab_filtered.get_snr_masked_intensity(vel_diff_colname, 
+                                                       snr_cut = snr_cut, 
+                                                       rayleigh = rayleigh, 
+                                                       velocity = True)
+
+        if velocity_bounds is None:
+            velocity_bounds = [-200, 200] * u.km/u.s 
+        if not hasattr(velocity_bounds, "unit"):
+            velocity_bounds *= u.km/u.s 
+            logging.warning("No units specified for velocity_bounds - assuming km/s")
+
+        vel_mask = velocity < velocity_bounds[0]
+        vel_mask |= velocity > velocity_bounds[1]
+        flux.mask = np.logical_or(flux.mask,vel_mask) 
+        velocity.mask = np.logical_or(velocity.mask,vel_mask) 
+
+        if vel_diff_colname is not None:
+            vel_mask_vd = velocity_vd < velocity_bounds[0]
+            vel_mask_vd |= velocity_vd > velocity_bounds[1]
+            flux_vd.mask = np.logical_or(flux_vd.mask,vel_mask_vd) 
+            velocity_vd.mask = np.logical_or(velocity_vd.mask,vel_mask_vd) 
+
+        if clip_flux is not None:
+            if not hasattr(clip_flux, "unit"):
+                clip_flux *= flux.unit
+            flux.mask = np.logical_or(flux.mask, flux > clip_flux)
+
+        lat = Angle(tab_filtered[latitude_colname])
+        lat = Masked(lat, mask = flux.mask)
+
+        valid_mask = ~flux.mask
+
+    
+
+        if vel_diff_colname is not None:
+            valid_mask_vd = ~flux_vd.mask 
+            valid_mask_vd &= valid_mask
+            # compute weighted histogram data
+            # Flux Weight
+            H_flux, xedges, yedges = np.histogram2d(
+                lat.unmasked[valid_mask_vd].value,
+                velocity.unmasked[valid_mask_vd].value,
+                weights = flux.unmasked.value[valid_mask_vd],
+                bins=gridsize,
+                density=False,
+                )
+
+            #Flux * Velocity difference weight
+            H_vd, xedges, yedges = np.histogram2d(
+                lat.unmasked[valid_mask_vd].value,
+                velocity.unmasked[valid_mask_vd].value,
+                weights = flux.unmasked.value[valid_mask_vd] * (
+                        velocity.unmasked[valid_mask_vd].value - 
+                        velocity_vd.unmasked[valid_mask_vd].value
+                    ),
+                bins=gridsize,
+                density=False,
+                )
+
+            H_vd_flux_weighted = H_vd / H_flux
+
+            hb = ax.pcolormesh(xedges, yedges, H_vd_flux_weighted.T, 
+                                norm = kwargs.pop("norm", Normalize(vmin = -10, vmax = 10)),
+                                cmap = kwargs.pop("cmap", "RdBu_r"),
+                                **kwargs)
+
+
+
+        else:
+
+            if kind == "hex":
+                hb = ax.hexbin(lat[valid_mask], velocity[valid_mask], 
+                               gridsize = gridsize,
+                               bins = bins, 
+                               C = flux.value[valid_mask],
+                               norm = kwargs.pop("norm",LogNorm(vmin = 1e0, vmax = 1e3)),
+                               **kwargs)
+
+            if kind in ["contour", "contourf"]:
+                # Make 2D density histogram
+                H, xedges, yedges = np.histogram2d(
+                    lat.unmasked[valid_mask].value,
+                    velocity.unmasked[valid_mask].value,
+                    weights = flux.unmasked.value[valid_mask],
+                    bins=gridsize,
+                    density=False,
+                )
+
+                # Smooth the density field
+                H_smooth = gaussian_filter(H, sigma=sigma)
+
+                # Convert bin edges to coordinates
+                X, Y = np.meshgrid(
+                    (xedges[:-1] + xedges[1:]) / 2,
+                    (yedges[:-1] + yedges[1:]) / 2
+                )
+
+                if auto_level_factors is None:
+                    auto_level_factors = [.1,.80]
+                levels = kwargs.pop("levels", np.geomspace(
+                H_smooth.max()*auto_level_factors[0],
+                H_smooth.max()*auto_level_factors[1],
+                n_levels),
+                )
+
+                hb = ax.contour(X, Y, H_smooth.T, 
+                                alpha = kwargs.pop("alpha", 0.7),
+                                # norm = kwargs.pop("norm", LogNorm(vmin = 1e0, vmax = 1e3)),
+                                levels = levels,
+                                **kwargs)
+        if colorbar:
+            if vel_diff_colname is not None:
+                cb = fig.colorbar(hb, label = cbar_kwargs.pop("label",r"$\Delta~V$ [{}$-${}] ({})".format(colname[5:], 
+                                                        vel_diff_colname[5:], 
+                                                        velocity.unit)),
+                    **cbar_kwargs)
+
+            else:
+
+                try:
+                    cb = fig.colorbar(hb, label = cbar_kwargs.pop("label","{} ({})".format(colname, flux.unit)),
+                    **cbar_kwargs)
+
+                except ValueError:
+                    cb = fig.colorbar(hb, **cbar_kwargs)
+
+        if label_axes:
+            _ = ax.set_xlabel("Galactic Latitude (deg)", fontsize = 12)
             _ = ax.set_ylabel(r"$V_{{LSR}}$ ($km~s^{{-1}}$)", fontsize = 12)
 
         return fig
