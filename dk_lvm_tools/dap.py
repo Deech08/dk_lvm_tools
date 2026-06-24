@@ -79,6 +79,7 @@ class dap(dapMixin, Table):
 		 		 eline_quants = None,
 		 		 include_primary_elines = False,
 		 		 n_batch = 1,
+		 		 processes = None,
 		 		 **kwargs):
 
 		self.pal_colorblind = sns.color_palette("colorblind")
@@ -139,7 +140,7 @@ class dap(dapMixin, Table):
 			if use_multiprocessing:
 				#split into batches
 				if n_batch == 1:
-					with multiprocessing.Pool() as pool:
+					with multiprocessing.Pool(processes = ncpu) as pool:
 						tables = pool.map(read_dap_lite, dap_files)
 						t = vstack(tables)
 
@@ -161,7 +162,7 @@ class dap(dapMixin, Table):
 					for ell in range(n_batch):
 						if verbose:
 							print("Starting batch {0}...".format(ell+1))
-						with multiprocessing.Pool() as pool:
+						with multiprocessing.Pool(processes = ncpu) as pool:
 							tt = pool.map(read_dap_lite, dap_files[split_inds[ell]:split_inds[ell+1]])
 						tables.append(vstack(tt))
 						if verbose:
