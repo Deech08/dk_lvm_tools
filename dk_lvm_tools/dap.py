@@ -375,9 +375,9 @@ def read_DAP_file(dap_file,
 		tab_RSP["e_Teff"] *= u.K
 		tab_RSP["disp"] *= u.km/u.s
 		tab_RSP["e_disp"] *= u.km/u.s
-		tab_RSP["flux"] *= lvm_flux
-		tab_RSP["med_flux"] *= lvm_flux
-		tab_RSP["e_med_flux"] *= lvm_flux
+		tab_RSP["flux"] *= lvm_flux_unit
+		tab_RSP["med_flux"] *= lvm_flux_unit
+		tab_RSP["e_med_flux"] *= lvm_flux_unit
 		tab_RSP["Teff_MW"] *= u.K
 		tab_RSP["e_Teff_MW"] *= u.K
 		tab_RSP["sys_vel"] *= u.km/u.s
@@ -399,8 +399,8 @@ def read_DAP_file(dap_file,
 
 		if (kel_ext == 1):
 			# Add units
-			tab_KEL["flux"] *= lvm_flux
-			tab_KEL["e_flux"] *= lvm_flux
+			tab_KEL["flux"] *= lvm_flux_unit
+			tab_KEL["e_flux"] *= lvm_flux_unit
 			tab_KEL["disp"] *= u.AA
 			tab_KEL["e_disp"] *= u.AA
 			tab_KEL["vel"] *= u.km/u.s
@@ -437,8 +437,8 @@ def read_DAP_file(dap_file,
 		#
 		
 		# Add units
-		tab_PE["flux"] *= lvm_flux
-		tab_PE["e_flux"] *= lvm_flux
+		tab_PE["flux"] *= lvm_flux_unit
+		tab_PE["e_flux"] *= lvm_flux_unit
 		tab_PE["disp"] *= u.AA
 		tab_PE["e_disp"] *= u.AA
 		tab_PE["vel"] *= u.km/u.s
@@ -464,7 +464,7 @@ def read_DAP_file(dap_file,
 		# Units for B
 		for name in tab_NPE_B.colnames:
 			if "flux_" in name:
-				tab_NPE_B[name] *= lvm_flux
+				tab_NPE_B[name] *= lvm_flux_unit
 			elif "vel_" in name:
 				tab_NPE_B[name] *= u.km/u.s
 			elif "disp_" in name:
@@ -475,7 +475,7 @@ def read_DAP_file(dap_file,
 		# Units for R
 		for name in tab_NPE_R.colnames:
 			if "flux_" in name:
-				tab_NPE_R[name] *= lvm_flux
+				tab_NPE_R[name] *= lvm_flux_unit
 			elif "vel_" in name:
 				tab_NPE_R[name] *= u.km/u.s
 			elif "disp_" in name:
@@ -486,7 +486,7 @@ def read_DAP_file(dap_file,
 		# Units for I
 		for name in tab_NPE_I.colnames:
 			if "flux_" in name:
-				tab_NPE_I[name] *= lvm_flux
+				tab_NPE_I[name] *= lvm_flux_unit
 			elif "vel_" in name:
 				tab_NPE_I[name] *= u.km/u.s
 			elif "disp_" in name:
