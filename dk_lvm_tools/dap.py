@@ -61,6 +61,8 @@ class dap(dapMixin, Table):
         Default is True
     n_batch: 'int'
     	split loading of files list into specified number of batches 
+    ncpu: 'int'
+    	ncpus to pass to processes keyword in multiprocessing.Pool()
 	**kwargs:
 		keywords passed to self.read_DAP_file
 
@@ -79,7 +81,7 @@ class dap(dapMixin, Table):
 		 		 eline_quants = None,
 		 		 include_primary_elines = False,
 		 		 n_batch = 1,
-		 		 processes = None,
+		 		 ncpu = None,
 		 		 **kwargs):
 
 		self.pal_colorblind = sns.color_palette("colorblind")
