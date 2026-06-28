@@ -216,7 +216,7 @@ class dap(dapMixin, Table):
 					t["GAL-LON"] = coords.l 
 					t["GAL-LAT"] = coords.b 
 				except KeyError:
-
+					pass
 
 			for colname in t.colnames:
 				if t[colname].unit is None:
