@@ -30,6 +30,8 @@ class dap(dapMixin, Table):
 	----------
 	filename: 'str', optional, must be keyword
 		filename of LVM DAP compiled data table
+	duckdb_query: 'str', optional, must be keyword
+		if loading a parquet file, will query it with the specified string
 	dap_files: 'str', 'listlike', optional, must be keyword
 		if provided, reads lvm dap files directly
 	dap_ver: 'str', optional, must be keyword
@@ -71,6 +73,7 @@ class dap(dapMixin, Table):
 	"""
 
 	def __init__(self, filename = None, 
+				 duckdb_query = None,
 				 dap_files = None, 
 				 dap_ver = None, 
 		 		 use_multiprocessing = True, 
@@ -195,6 +198,41 @@ class dap(dapMixin, Table):
 				super().__init__(data = t.columns, meta = t.meta, **kwargs)
 				# del t
 
+		elif duckdb_query is not None:
+			import duckdb 
+			from astropy.io.misc.pyarrow.csv import convert_pa_table_to_astropy_table
+			res = duckdb.query(duckdb_query)
+			arrow_res = res.arrow()
+			t = convert_pa_table_to_astropy_table(arrow_res.read_all())
+
+			# Try to get DAP version from filename
+			v_pattern = r"v_\d+\.\d+\.\d+"
+			match = re.search(v_pattern, duckdb_query)
+			if match:
+				self.dap_ver = match.group().split("v")[-1]
+			if "GAL-LON" not in t.colnames:
+				try:
+					coords = SkyCoord(t["ra"], t["dec"], frame = "icrs").transform_to("galactic")
+					t["GAL-LON"] = coords.l 
+					t["GAL-LAT"] = coords.b 
+				except KeyError:
+
+
+			for colname in t.colnames:
+				if t[colname].unit is None:
+					if "flux" in colname:
+						t[colname].unit = lvm_flux_unit
+					if "vel" in colname:
+						t[colname].unit = u.km/u.s
+					if "GAL-LON" in colname:
+						t[colname].unit = u.deg
+					if "GAL-LAT" in colname:
+						t[colname].unit = u.deg
+
+
+			super().__init__(data = t.columns, meta = t.meta, **kwargs)
+			# del t
+
 		elif filename is not None:
 			t = Table.read(filename)
 
@@ -212,6 +250,8 @@ class dap(dapMixin, Table):
 				if t[colname].unit is None:
 					if "flux" in colname:
 						t[colname].unit = lvm_flux_unit
+					if "vel" in colname:
+						t[colname].unit = u.km/u.s
 
 
 
