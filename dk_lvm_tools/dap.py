@@ -237,7 +237,7 @@ class dap(dapMixin, Table):
 			# del t
 
 		elif filename is not None:
-			t = Table.read(filename, file_format = format)
+			t = Table.read(filename, format = file_format)
 
 			# Try to get DAP version from filename
 			v_pattern = r"v_\d+\.\d+\.\d+"
