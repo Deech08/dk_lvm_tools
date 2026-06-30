@@ -233,10 +233,11 @@ class dapMixin(object):
         elif scale == "log10":
             flux_out = Masked(np.log10(flux.value), mask = snr < snr_cut|np.isnan(snr))
 
-        vel_colname = "vel{}".format(colname[4:])
-        vel_out = Masked(self[vel_colname].quantity, mask = flux_out.mask)
+        
 
         if velocity:
+            vel_colname = "vel{}".format(colname[4:])
+            vel_out = Masked(self[vel_colname].quantity, mask = flux_out.mask)
             return flux_out, vel_out
         else:
             return flux_out
