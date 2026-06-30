@@ -32,7 +32,7 @@ class dap(dapMixin, Table):
 		filename of LVM DAP compiled data table
 	duckdb_query: 'str', optional, must be keyword
 		if loading a parquet file, will query it with the specified string
-	format: 'str'
+	file_format: 'str'
 		if provided, passes to Table.read (with a filename that is provided)
 	dap_files: 'str', 'listlike', optional, must be keyword
 		if provided, reads lvm dap files directly
@@ -76,7 +76,7 @@ class dap(dapMixin, Table):
 
 	def __init__(self, filename = None, 
 				 duckdb_query = None,
-				 format = None,
+				 file_format = None,
 				 dap_files = None, 
 				 dap_ver = None, 
 		 		 use_multiprocessing = True, 
@@ -237,7 +237,7 @@ class dap(dapMixin, Table):
 			# del t
 
 		elif filename is not None:
-			t = Table.read(filename, format = format)
+			t = Table.read(filename, file_format = format)
 
 			# Try to get DAP version from filename
 			v_pattern = r"v_\d+\.\d+\.\d+"
