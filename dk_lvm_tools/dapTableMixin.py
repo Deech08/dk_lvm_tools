@@ -32,10 +32,28 @@ class dapMixin(object):
     Mixin class with convenience functions for LVM DAP data
     """
 
+
+
     def __get_item__(self, item):
         sliced_super = super().__get_item__(item)
 
         return self.__class__(data = sliced_super.data)
+
+    def load_column_list(self, colnames_list):
+        """
+        Load a list of columns in bulk from parquet files
+        Only if using live loading
+
+        Parameters
+        ----------
+        colnames_list: 'list-like'
+            list of column names to load
+        """
+        if self.parquet_pattern is None:
+            raise ValueError("Can only load columns if initialized dap with parquet_pattern for live-loading")
+
+        else:
+            self._load_data_for_items(colnames_list)
 
     def load_drpall(self, filename = None):
         """

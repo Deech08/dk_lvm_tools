@@ -1,6 +1,6 @@
 import numpy as np 
 from astropy import units as u
-from astropy.table import Table, join, vstack
+from astropy.table import Table, join, vstack, TableAttribute
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord, Angle, LSR
@@ -79,8 +79,14 @@ class dap(dapMixin, Table):
 
     """
 
+    parquet_pattern = TableAttribute(default = None)
+    sas_base_dir = TableAttribute(default = os.environ["SAS_BASE_DIR"])
+    path_to_data_dir = TableAttribute(default = "sdsswork/lvm/spectro/analysis/")
+    # dap_ver = TableAttribute(default = "1.2.1")
+    pal_colorblind = TableAttribute(default = sns.color_palette("colorblind"))
+
     def __init__(self, 
-                 parquet_pattern = None,
+                 # parquet_pattern = None,
                  parquet_where = None,
                  filename = None, 
                  duckdb_query = None,
@@ -98,7 +104,9 @@ class dap(dapMixin, Table):
                  ncpu = None,
                  **kwargs):
 
-        self.pal_colorblind = sns.color_palette("colorblind")
+        parquet_pattern = kwargs.get('parquet_pattern', self.__class__.parquet_pattern.default)
+        sas_base_dir = kwargs.get('sas_base_dir', self.__class__.sas_base_dir.default)
+        path_to_data_dir = kwargs.get('path_to_data_dir', self.__class__.path_to_data_dir.default)
 
         if use_multiprocessing:
             import multiprocessing
@@ -106,15 +114,16 @@ class dap(dapMixin, Table):
         
 
         if dap_ver is not None:
-            self.sas_base_dir = os.environ["SAS_BASE_DIR"]
-            self.path_to_data_dir = "sdsswork/lvm/spectro/analysis/"
+            # sas_base_dir = TableAttribute(default = os.environ["SAS_BASE_DIR"])
+            # path_to_data_dir = TableAttribute(default = "sdsswork/lvm/spectro/analysis/")
+            # dap_ver = TableAttribute(default = "1.2.1")
             self.dap_ver = dap_ver
             
             pattern = "**/*.dap.fits.gz"
 
             # === Find all matching FITS files recursively ===
-            dap_files = glob.glob(os.path.join(self.sas_base_dir, 
-                                               self.path_to_data_dir, 
+            dap_files = glob.glob(os.path.join(sas_base_dir, 
+                                               path_to_data_dir, 
                                                self.dap_ver, pattern), 
                                   recursive = True)
             if verbose:
@@ -219,7 +228,7 @@ class dap(dapMixin, Table):
                 FROM read_parquet('{}', union_by_name = True)
             """.format(parquet_pattern)
 
-            self.parquet_pattern = parquet_pattern
+            
 
             if parquet_where is not None:
                 duckdb_query = f"{duckdb_query} {parquet_where}"
@@ -353,7 +362,7 @@ class dap(dapMixin, Table):
         Loads data from parquet query
         """
 
-        lvm_ids = self["id"].data
+        lvm_ids = self["id"].data.tolist()
         query_string = """
             SELECT
                 CAST("id" AS BLOB) AS id,
@@ -362,7 +371,7 @@ class dap(dapMixin, Table):
             WHERE "id" = ANY(?)
         """.format(item, self.parquet_pattern)
 
-        item_df = duckdb.sql(query_string, params = [lvm_ids.tolist()]).fetchdf()
+        item_df = duckdb.sql(query_string, params = [lvm_ids]).fetchdf()
         item_df["id"] = item_df["id"].apply(bytes)
         item_df = (
                 item_df.set_index("id").reindex(lvm_ids).reset_index()
@@ -380,10 +389,49 @@ class dap(dapMixin, Table):
             unit = u.deg
         elif item == "dec":
             unit = u.deg
+        else:
+            unit = 1.
 
 
         self[item] = item_df[item].__array__() * unit
 
+    def _load_data_for_items(self, items):
+        """
+        Loads data from parquet query for multiple items at once
+        """
+        lvm_ids = self["id"].data.tolist()
+        query_string = """
+            SELECT
+                CAST("id" AS BLOB) AS id,
+                "{}",
+            FROM read_parquet('{}', union_by_name = True)
+            WHERE "id" = ANY(?)
+        """.format('", "'.join(items), self.parquet_pattern)
+
+        item_df = duckdb.sql(query_string, params = [lvm_ids]).fetchdf()
+        item_df["id"] = item_df["id"].apply(bytes)
+        item_df = (
+                item_df.set_index("id").reindex(lvm_ids).reset_index()
+            )
+
+        for item in items:
+            if "flux" in item:
+                unit = lvm_flux_unit
+            elif "vel" in item:
+                unit = u.km/u.s
+            elif item == "GAL-LON":
+                unit = u.deg
+            elif item == "GAL-LAT":
+                unit = u.deg
+            elif item == "ra":
+                unit = u.deg
+            elif item == "dec":
+                unit = u.deg
+            else:
+                unit = 1.
+
+
+            self[item] = item_df[item].__array__() * unit
 
 
 
