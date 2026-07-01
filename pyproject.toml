@@ -20,7 +20,9 @@ dependencies = [
     "numpy",
     "seaborn",
     "pandas",
-    "tqdm"
+    "tqdm",
+    "pyarrow",
+    "duckdb",
 ]
 dynamic = ["version"]
 
