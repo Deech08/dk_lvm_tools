@@ -287,7 +287,18 @@ class dap(dapMixin, Table):
 
             for colname in t.colnames:
                 if t[colname].unit is None:
-                   c
+                    if "flux" in colname:
+                        t[colname].unit = lvm_flux_unit
+                    if "vel" in colname:
+                        t[colname].unit = u.km/u.s
+                    if colname == "GAL-LON":
+                        t[colname].unit = u.deg
+                    if colname == "GAL-LAT":
+                        t[colname].unit = u.deg
+                    if colname == "ra":
+                        t[colname].unit = u.deg
+                    if colname == "dec":
+                        t[colname].unit = u.deg
 
 
 
@@ -431,7 +442,7 @@ class dap(dapMixin, Table):
                 unit = 1.
 
 
-            self[item] = item_df[item].__array__() * unit
+        self[item] = item_df[item].__array__() * unit
 
 
 
