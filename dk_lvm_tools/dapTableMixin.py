@@ -1588,6 +1588,7 @@ class dapMixin(object):
                            c = flux.value,                 
                            edgecolors='none', 
                            norm = norm,
+                           marker = "H",
                            **kwargs)
                 ax.set_xlabel("Galactic Longitude (deg)")
                 ax.set_ylabel("Galactic Latitude (deg)")
@@ -1598,6 +1599,7 @@ class dapMixin(object):
                            c = c,                  
                            edgecolors='none', 
                            norm = norm,
+                           marker = "H",
                            **kwargs)
                 ax.set_xlabel("Galactic Longitude (deg)")
                 ax.set_ylabel("Galactic Latitude (deg)")

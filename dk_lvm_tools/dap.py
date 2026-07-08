@@ -442,7 +442,7 @@ class dap(dapMixin, Table):
                 unit = 1.
 
 
-        self[item] = item_df[item].__array__() * unit
+            self[item] = item_df[item].__array__() * unit
 
 
 
