@@ -385,7 +385,7 @@ class dap(dapMixin, Table):
         item_df = duckdb.sql(query_string, params = [lvm_ids]).fetchdf()
         item_df["id"] = item_df["id"].apply(bytes)
         item_df = (
-                item_df.set_index("id").reindex(lvm_ids).reset_index()
+                item_df.set_index("id").reindex(np.array(lvm_ids, dtype = bytes)).reset_index()
             )
 
         if "flux" in item:
@@ -422,7 +422,7 @@ class dap(dapMixin, Table):
         item_df = duckdb.sql(query_string, params = [lvm_ids]).fetchdf()
         item_df["id"] = item_df["id"].apply(bytes)
         item_df = (
-                item_df.set_index("id").reindex(lvm_ids).reset_index()
+                item_df.set_index("id").reindex(np.array(lvm_ids, dtype = bytes)).reset_index()
             )
 
         for item in items:
