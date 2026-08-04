@@ -1468,7 +1468,7 @@ class dapMixin(object):
                 if len(percentile_clip) != 2:
                     logging.warning("percentile_clip must only have two values in tuple or list form - ignoring!")
                 else:
-                    low,high = np.percentile(flux, percentile_clip)
+                    low,high = np.percentile(flux.value, percentile_clip)
                     norm = LogNorm(vmin = low, vmax = high)
 
 
