@@ -113,6 +113,22 @@ class dap(dapMixin, Table):
 
         
 
+        if parquet_pattern is not None:
+            duckdb_query = """
+                SELECT
+                    "id",
+                    "ra",
+                    "dec",
+                    "GAL-LON",
+                    "GAL-LAT",
+                FROM read_parquet('{}', union_by_name = True)
+            """.format(parquet_pattern)
+
+            
+
+            if parquet_where is not None:
+                duckdb_query = f"{duckdb_query} {parquet_where}"
+
         if dap_ver is not None:
             # sas_base_dir = TableAttribute(default = os.environ["SAS_BASE_DIR"])
             # path_to_data_dir = TableAttribute(default = "sdsswork/lvm/spectro/analysis/")
@@ -217,23 +233,7 @@ class dap(dapMixin, Table):
 
                 super().__init__(data = t.columns, meta = t.meta, **kwargs)
                 # del t
-        if parquet_pattern is not None:
-            duckdb_query = """
-                SELECT
-                    "id",
-                    "ra",
-                    "dec",
-                    "GAL-LON",
-                    "GAL-LAT",
-                FROM read_parquet('{}', union_by_name = True)
-            """.format(parquet_pattern)
-
-            
-
-            if parquet_where is not None:
-                duckdb_query = f"{duckdb_query} {parquet_where}"
-
-        if duckdb_query is not None:
+        elif duckdb_query is not None:
             import duckdb 
             from astropy.io.misc.pyarrow.csv import convert_pa_table_to_astropy_table
             res = duckdb.query(duckdb_query)
