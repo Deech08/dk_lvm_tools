@@ -183,7 +183,10 @@ class dap(dapMixin, Table):
                 if n_batch == 1:
                     with multiprocessing.Pool(processes = ncpu) as pool:
                         tables = pool.map(read_dap_lite, dap_files)
-                        t = vstack(tables)
+                    tables, skipped = _split_good_tables(tables, dap_files)
+                    if len(tables) == 0:
+                        raise ValueError("No readable DAP files: all {} files were skipped".format(len(dap_files)))
+                    t = vstack(tables)
 
 
                 # if n_batch == 2:
@@ -200,16 +203,24 @@ class dap(dapMixin, Table):
                         print("Splitting into {0} batches to load...".format(n_batch))
                     split_inds = np.linspace(0,len(dap_files),n_batch+1).astype(int)
                     tables = []
+                    skipped = []
                     for ell in range(n_batch):
                         if verbose:
                             print("Starting batch {0}...".format(ell+1))
+                        batch_files = dap_files[split_inds[ell]:split_inds[ell+1]]
                         with multiprocessing.Pool(processes = ncpu) as pool:
-                            tt = pool.map(read_dap_lite, dap_files[split_inds[ell]:split_inds[ell+1]])
-                        tables.append(vstack(tt))
+                            tt = pool.map(read_dap_lite, batch_files)
+                        tt, batch_skipped = _split_good_tables(tt, batch_files)
+                        skipped.extend(batch_skipped)
+                        if len(tt) > 0:
+                            tables.append(vstack(tt))
                         if verbose:
                             print("Batch {0} of {1} complete.".format(ell+1, n_batch))
 
+                    if len(tables) == 0:
+                        raise ValueError("No readable DAP files: all {} files were skipped".format(len(dap_files)))
                     t = vstack(tables)
+                _report_skipped(t, skipped, len(dap_files))
                 coords = SkyCoord(t["ra"], t["dec"], frame = "icrs").transform_to("galactic")
                 t["GAL-LON"] = coords.l 
                 t["GAL-LAT"] = coords.b 
@@ -221,8 +232,12 @@ class dap(dapMixin, Table):
             else:
                 print("starting to read data...")
                 tables = list(map(read_dap_lite, tqdm(dap_files)))
+                tables, skipped = _split_good_tables(tables, dap_files)
+                if len(tables) == 0:
+                    raise ValueError("No readable DAP files: all {} files were skipped".format(len(dap_files)))
 
                 t = vstack(tables)
+                _report_skipped(t, skipped, len(dap_files))
 
                 coords = SkyCoord(t["ra"], t["dec"], frame = "icrs").transform_to("galactic")
                 t["GAL-LON"] = coords.l 
@@ -452,6 +467,25 @@ class dap(dapMixin, Table):
 
         
 
+def _split_good_tables(tables, dap_files):
+    """
+    Separate successfully read tables from files that read_DAP_file skipped (returned None)
+
+    Returns (good_tables, skipped_files)
+    """
+    skipped = [fname for fname, tab in zip(dap_files, tables) if tab is None]
+    good = [tab for tab in tables if tab is not None]
+    return good, skipped
+
+def _report_skipped(table, skipped, n_total):
+    """
+    Print a summary of skipped DAP files and record them in table.meta["skipped_dap_files"]
+    """
+    if len(skipped) > 0:
+        print("WARNING: skipped {0} of {1} DAP files that were incomplete "
+              "(see table.meta['skipped_dap_files'])".format(len(skipped), n_total))
+    table.meta["skipped_dap_files"] = list(skipped)
+
 def check_DAP_file(dap_file):
     with fits.open(dap_file) as dap_hdu:
         try:
@@ -497,6 +531,11 @@ def read_DAP_file(dap_file,
     include_primary_elines: `bool`
         if True, includes primary emission line measurements from Gaussian Model
         Default is True
+
+    Returns
+    -------
+    tab_DAP: `astropy.table.Table`, or None if the file is missing a required
+        extension or header keyword (a warning naming the file is printed)
         
     """
     if lite:
@@ -544,7 +583,29 @@ def read_DAP_file(dap_file,
             "EW":u.AA,
         }
     
-    with fits.open(dap_file) as dap_hdu:
+    # Extensions and header keywords this function needs; incomplete DAP files
+    # (e.g. from interrupted DAP runs) are skipped by returning None
+    required_hdus = ["PT", "NP_ELINES_B", "NP_ELINES_R", "NP_ELINES_I"]
+    if include_primary_elines:
+        required_hdus.append("PM_ELINES")
+    if not lite:
+        required_hdus.extend(["RSP", "COEFFS"])
+    required_keys = ["HIERARCH WAVE HELIORV_SCI"]
+
+    try:
+        dap_hdu = fits.open(dap_file)
+        present = [hdu.name for hdu in dap_hdu]
+    except (OSError, EOFError) as e:
+        print("WARNING: skipping unreadable DAP file {0} ({1}: {2})".format(dap_file, type(e).__name__, e))
+        return None
+
+    with dap_hdu:
+        missing = ["extension {}".format(name) for name in required_hdus if name not in present]
+        missing += ["keyword {}".format(key) for key in required_keys if key not in dap_hdu[0].header]
+        if len(missing) > 0:
+            print("WARNING: skipping incomplete DAP file {0} (missing {1})".format(dap_file, ", ".join(missing)))
+            return None
+
         #header
         head = dap_hdu[0].header
         tab_PT=Table(dap_hdu['PT'].data)
